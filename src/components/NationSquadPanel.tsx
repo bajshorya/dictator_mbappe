@@ -47,24 +47,22 @@ export default function NationSquadPanel({ squad, takenIds, selectedId, onPick, 
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        {squad.players.map((p) => (
-          {(() => {
-            const taken = takenIds.has(p.id);
-            const tooPricey = !taken && affordable ? !affordable(p) : false;
-            return (
-              <PlayerCard
-                key={p.id}
-                player={p}
-                size="sm"
-                disabled={taken || tooPricey}
-                disabledLabel={taken ? "Picked" : "Over budget"}
-                cost={playerCost(p.rating)}
-                selected={p.id === selectedId}
-                onClick={() => onPick(p)}
-              />
-            );
-          })()}
-        ))}
+        {squad.players.map((p) => {
+          const taken = takenIds.has(p.id);
+          const tooPricey = !taken && affordable ? !affordable(p) : false;
+          return (
+            <PlayerCard
+              key={p.id}
+              player={p}
+              size="sm"
+              disabled={taken || tooPricey}
+              disabledLabel={taken ? "Picked" : "Over budget"}
+              cost={playerCost(p.rating)}
+              selected={p.id === selectedId}
+              onClick={() => onPick(p)}
+            />
+          );
+        })}
       </div>
     </motion.div>
   );
