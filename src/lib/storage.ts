@@ -34,6 +34,30 @@ export function placementRank(placement: string): number {
   return 1; // group stage
 }
 
+// ---- Daily Challenge ----
+export interface DailyResult {
+  placement: string;
+  won: boolean;
+  grade: string;
+}
+export function getDaily(key: string): DailyResult | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`footy:daily:${key}`);
+    return raw ? (JSON.parse(raw) as DailyResult) : null;
+  } catch {
+    return null;
+  }
+}
+export function saveDaily(key: string, r: DailyResult) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`footy:daily:${key}`, JSON.stringify(r));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function getHallOfFame(): HallOfFame {
   if (typeof window === "undefined") return EMPTY;
   try {

@@ -97,12 +97,22 @@ export interface GroupStanding {
   pts: number;
   qualified: boolean;
   isUser: boolean;
+  pot?: number; // seeding pot 1-4
 }
 
 /** A single match the user played, tagged with the round it belongs to. */
 export interface JourneyStep {
   stage: string;
   match: MatchResult;
+}
+
+export interface TournamentMvp {
+  name: string;
+  team: string;
+  year: number;
+  goals: number;
+  apps: number;
+  motm: number;
 }
 
 export interface TournamentResult {
@@ -115,4 +125,5 @@ export interface TournamentResult {
   userJourney: JourneyStep[];
   userGroupName: string;
   userGroupTable: GroupStanding[];
+  tournamentMvp?: TournamentMvp;
 }

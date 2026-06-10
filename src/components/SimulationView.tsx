@@ -6,6 +6,7 @@ import { Check, Flag, Radio, SkipForward, Sparkles, X } from "lucide-react";
 import type { MatchResult, TournamentResult } from "@/lib/types";
 import { USER_TEAM_NAME } from "@/data/teams";
 import { teamFlag } from "@/lib/flags";
+import { sound } from "@/lib/sound";
 import Shootout from "@/components/Shootout";
 
 type SimEvent = { type: "match"; stage: string; match: MatchResult } | { type: "table" };
@@ -126,6 +127,18 @@ export default function SimulationView({ result, onDone }: Props) {
     return () => timers.current.forEach(clearTimeout);
   }, [idx, events]);
 
+  // Sound on reveals
+  useEffect(() => {
+    if (!scoreShown || curEvent?.type !== "match") return;
+    const m = curEvent.match;
+    const gf = m.home === USER_TEAM_NAME ? m.homeGoals : m.awayGoals;
+    if (gf > 0) sound.goal();
+    else sound.whistle();
+  }, [scoreShown, curEvent]);
+  useEffect(() => {
+    if (idx >= events.length) (result.userWon ? sound.win : sound.lose)();
+  }, [idx, events.length, result.userWon]);
+
   const finished = idx >= events.length;
   const tableIndex = events.findIndex((e) => e.type === "table");
   const tableShown = idx > tableIndex;
@@ -183,7 +196,8 @@ export default function SimulationView({ result, onDone }: Props) {
               }`}
             >
               <span className="text-base">{r.flag}</span>
-              <span className="truncate">{r.name}</span>
+              <span className="flex-1 truncate">{r.name}</span>
+              {r.pot && <span className="rounded bg-black/30 px-1 text-[9px] text-slate-400">P{r.pot}</span>}
             </motion.div>
           ))}
         </div>

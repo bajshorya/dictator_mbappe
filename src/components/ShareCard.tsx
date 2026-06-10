@@ -85,6 +85,12 @@ const ShareCard = forwardRef<HTMLDivElement, Props>(function ShareCard(
         <Stat label="Top scorer" value={topScorer ? `${topScorer.goals}` : "0"} sub={topScorer?.player.name.split(" ").slice(-1)[0]} />
       </div>
 
+      {result.tournamentMvp && (
+        <div className="mt-3 rounded-xl bg-violet-300/10 px-3 py-2 text-center text-[11px] text-violet-200 ring-1 ring-violet-300/20">
+          ★ Player of the Tournament: {flagFor(result.tournamentMvp.team)} {result.tournamentMvp.name}
+        </div>
+      )}
+
       <div className="mt-4 text-center text-[10px] text-slate-500">
         Build your all-time World Cup XI · Footy
       </div>

@@ -1,5 +1,6 @@
 import { NATIONAL_TEAMS, USER_TEAM_FLAG, USER_TEAM_NAME } from "@/data/teams";
 import { computeChemistry } from "@/lib/chemistry";
+import { rnd, setSeed } from "@/lib/rng";
 import type {
   Difficulty,
   GroupStanding,
@@ -38,7 +39,7 @@ function personaFor(name: string): Style {
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rnd() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -50,7 +51,7 @@ function poisson(lambda: number): number {
   let p = 1;
   do {
     k++;
-    p *= Math.random();
+    p *= rnd();
   } while (p > L);
   return k - 1;
 }
@@ -81,10 +82,14 @@ interface Side {
 
 function simulateMatch(home: Side, away: Side, knockout: boolean, tactics: number): MatchResult {
   const diff = home.strength - away.strength;
-  const formH = 0.82 + Math.random() * 0.36;
-  const formA = 0.82 + Math.random() * 0.36;
+  const formH = 0.82 + rnd() * 0.36;
+  const formA = 0.82 + rnd() * 0.36;
   let xgH = clamp((1.35 + diff * 0.055) * formH, 0.15, 5);
   let xgA = clamp((1.35 - diff * 0.055) * formA, 0.15, 5);
+
+  // Home advantage (the side listed as home plays "at home").
+  xgH *= 1.06;
+  xgA *= 0.97;
 
   // Manager styles: own attack up, opponent's defence brings you down.
   xgH = (xgH * home.style.atk) / away.style.def;
@@ -101,12 +106,12 @@ function simulateMatch(home: Side, away: Side, knockout: boolean, tactics: numbe
 
   let redH = 0;
   let redA = 0;
-  if (Math.random() < 0.07) {
+  if (rnd() < 0.07) {
     redH = 1;
     xgH *= 0.72;
     xgA *= 1.15;
   }
-  if (Math.random() < 0.07) {
+  if (rnd() < 0.07) {
     redA = 1;
     xgA *= 0.72;
     xgH *= 1.15;
@@ -140,12 +145,12 @@ function simulateMatch(home: Side, away: Side, knockout: boolean, tactics: numbe
       let awayPens = 0;
       const pHome = clamp(0.72 + diff * 0.004, 0.55, 0.85);
       for (let i = 0; i < 5; i++) {
-        if (Math.random() < pHome) homePens++;
-        if (Math.random() < 1.44 - pHome) awayPens++;
+        if (rnd() < pHome) homePens++;
+        if (rnd() < 1.44 - pHome) awayPens++;
       }
       while (homePens === awayPens) {
-        if (Math.random() < pHome) homePens++;
-        if (Math.random() < 1.44 - pHome) awayPens++;
+        if (rnd() < pHome) homePens++;
+        if (rnd() < 1.44 - pHome) awayPens++;
       }
       result.homePens = homePens;
       result.awayPens = awayPens;
@@ -208,7 +213,7 @@ function weightedSample(pool: Player[], n: number): Player[] {
   const rest = [...pool];
   for (let k = 0; k < n && rest.length; k++) {
     const total = rest.reduce((s, p) => s + p.rating, 0);
-    let r = Math.random() * total;
+    let r = rnd() * total;
     let idx = 0;
     for (let i = 0; i < rest.length; i++) {
       r -= rest[i].rating;
@@ -233,7 +238,7 @@ function attributeMatch(
   subsOut: Player[],
 ): { name: string; goals: number }[] {
   for (const p of pitch) appMap.set(p.id, (appMap.get(p.id) ?? 0) + 1);
-  const nSubs = Math.min(bench.length, [0, 1, 1, 2, 2, 3][Math.floor(Math.random() * 6)]);
+  const nSubs = Math.min(bench.length, [0, 1, 1, 2, 2, 3][Math.floor(rnd() * 6)]);
   const subs = weightedSample(bench, nSubs);
   for (const p of subs) {
     appMap.set(p.id, (appMap.get(p.id) ?? 0) + 1);
@@ -248,7 +253,7 @@ function attributeMatch(
   const total = scorers.reduce((s, x) => s + x.w, 0) || 1;
   const matchGoals = new Map<string, { name: string; goals: number }>();
   for (let g = 0; g < goals; g++) {
-    let r = Math.random() * total;
+    let r = rnd() * total;
     for (const x of scorers) {
       r -= x.w;
       if (r <= 0) {
@@ -279,9 +284,10 @@ const KO_NAMES = ["Round of 32", "Round of 16", "Quarter-Finals", "Semi-Finals",
 export function simulateTournament(
   xi: Player[],
   bench: Player[] = [],
-  opts: { captainId?: string | null; difficulty?: Difficulty; tactics?: number } = {},
+  opts: { captainId?: string | null; difficulty?: Difficulty; tactics?: number; seed?: number | null } = {},
 ): TournamentResult {
-  const { captainId, difficulty = "normal", tactics = 0 } = opts;
+  const { captainId, difficulty = "normal", tactics = 0, seed = null } = opts;
+  if (seed != null) setSeed(seed); // reproducible result for the Daily Challenge
   const offset = DIFFICULTY_OFFSET[difficulty];
 
   // ---- per-player condition that carries across the tournament ----
@@ -338,20 +344,30 @@ export function simulateTournament(
     .slice(0, 47)
     .map((t) => ({ name: t.name, flag: t.flag, strength: t.strength + offset, isUser: false, style: personaFor(t.name) }));
 
-  const allSides = shuffle([userSide, ...realSides]);
-  const groups: Side[][] = Array.from({ length: 12 }, (_, i) => allSides.slice(i * 4, i * 4 + 4));
+  // Seeded group draw with pots: rank 48 teams, split into 4 pots of 12, and
+  // give every group one team from each pot (just like the real World Cup draw).
+  const allSides = [userSide, ...realSides];
+  const ranked = [...allSides].sort((a, b) => b.strength - a.strength);
+  const pots = [ranked.slice(0, 12), ranked.slice(12, 24), ranked.slice(24, 36), ranked.slice(36, 48)];
+  const potByName = new Map<string, number>();
+  pots.forEach((pot, pi) => pot.forEach((s) => potByName.set(s.name, pi + 1)));
+  const perms = pots.map(() => shuffle([...Array(12).keys()]));
+  const groups: Side[][] = Array.from({ length: 12 }, (_, gi) => pots.map((pot, pi) => pot[perms[pi][gi]]));
 
   const rounds: RoundResult[] = [];
   const userJourney: JourneyStep[] = [];
   const appMap = new Map<string, number>();
   const goalMap = new Map<string, number>();
+  let userStreak = 0; // momentum — consecutive user wins boost the next match
 
-  // Set the user's strength for the next match based on current condition.
-  let pending: { players: Player[]; used: Set<string>; notes: string[] } | null = null;
+  // Set the user's strength for the next match based on current condition + momentum.
+  let pending: { players: Player[]; used: Set<string>; notes: string[]; momentum: boolean } | null = null;
   const prepUser = (opponent: Side) => {
-    pending = availableXI();
-    userSide.strength = matchStrength(pending.players, pending.used);
+    const a = availableXI();
+    const momentum = Math.min(3, userStreak);
+    userSide.strength = matchStrength(a.players, a.used) + momentum;
     userSide.style = NEUTRAL;
+    pending = { ...a, momentum: userStreak >= 2 };
     void opponent;
   };
 
@@ -379,16 +395,21 @@ export function simulateTournament(
       else c.fatigue = Math.max(0, c.fatigue - 0.45);
     }
     for (const p of avail.players) {
-      if (!st(p.id).injured && Math.random() < 0.025) {
+      if (!st(p.id).injured && rnd() < 0.025) {
         st(p.id).injured = true;
         notes.push(`${p.name} picks up a tournament-ending injury`);
       }
     }
     if (userRed && avail.players.length) {
-      const victim = avail.players[Math.floor(Math.random() * avail.players.length)];
+      const victim = avail.players[Math.floor(rnd() * avail.players.length)];
       st(victim.id).ban = Math.max(st(victim.id).ban, 1);
       notes.push(`${victim.name} sent off — suspended for the next match`);
     }
+    // Momentum: track the user's win streak; surface it when it's rolling.
+    if (avail.momentum) notes.unshift("Momentum — your side rides a winning streak");
+    if (m.winner === USER_TEAM_NAME) userStreak++;
+    else userStreak = 0;
+
     if (notes.length) m.notes = notes;
     if (m.homePens != null) m.pendingShootout = true;
     userJourney.push({ stage, match: m });
@@ -443,6 +464,7 @@ export function simulateTournament(
     pts: s.pts,
     qualified: qualifiedNames.has(s.side.name),
     isUser: s.side.isUser,
+    pot: potByName.get(s.side.name),
   }));
 
   // ---- Knockout bracket ----
@@ -485,6 +507,24 @@ export function simulateTournament(
     .map((p) => ({ player: p, goals: goalMap.get(p.id) ?? 0, apps: appMap.get(p.id) ?? 0 }))
     .sort((a, b) => b.goals - a.goals || b.apps - a.apps || b.player.rating - a.player.rating);
 
+  // ---- Player of the Tournament (your squad): most MOTMs, then goals, then apps ----
+  const motm = new Map<string, number>();
+  for (const j of userJourney) if (j.match.mvp) motm.set(j.match.mvp, (motm.get(j.match.mvp) ?? 0) + 1);
+  let tournamentMvp: TournamentResult["tournamentMvp"];
+  if (userJourney.length > 0) {
+    let bestScore = -1;
+    for (const s of playerStats) {
+      const mc = motm.get(s.player.name) ?? 0;
+      const score = mc * 3 + s.goals * 1.5 + s.apps * 0.2;
+      if (score > bestScore) {
+        bestScore = score;
+        tournamentMvp = { name: s.player.name, team: s.player.team, year: s.player.year, goals: s.goals, apps: s.apps, motm: mc };
+      }
+    }
+  }
+
+  if (seed != null) setSeed(null); // restore normal (unseeded) randomness
+
   return {
     rounds,
     champion,
@@ -495,5 +535,6 @@ export function simulateTournament(
     userJourney,
     userGroupName,
     userGroupTable,
+    tournamentMvp,
   };
 }

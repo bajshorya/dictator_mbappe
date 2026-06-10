@@ -23,11 +23,22 @@ interface Props {
   player: Player;
   onClick?: () => void;
   selected?: boolean;
-  disabled?: boolean; // already taken (by-nation mode)
+  disabled?: boolean; // taken or unaffordable
+  disabledLabel?: string; // why it's blocked, e.g. "Over budget"
+  cost?: number; // star-points cost
   size?: "sm" | "md";
 }
 
-export default function PlayerCard({ player, onClick, selected, disabled, size = "md" }: Props) {
+export default function PlayerCard({
+  player,
+  onClick,
+  selected,
+  disabled,
+  disabledLabel = "Picked",
+  cost,
+  size = "md",
+}: Props) {
+  const overBudget = disabledLabel === "Over budget";
   const interactive = !!onClick && !disabled;
   return (
     <motion.button
@@ -83,21 +94,36 @@ export default function PlayerCard({ player, onClick, selected, disabled, size =
         <span className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
           WC {player.year}
         </span>
-        {player.award ? (
-          <span className="flex items-center gap-1 text-[10px] font-medium text-yellow-200" title={player.award}>
-            <Award className="h-3 w-3" />
-          </span>
-        ) : player.goals > 0 ? (
-          <span className="flex items-center gap-1 text-[11px] font-medium text-amber-200/90">
-            <Target className="h-3 w-3" />
-            {player.goals}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-1.5">
+          {cost != null && (
+            <span className="rounded bg-yellow-300/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-yellow-200">
+              ★{cost}
+            </span>
+          )}
+          {player.award ? (
+            <span className="text-yellow-200" title={player.award}>
+              <Award className="h-3 w-3" />
+            </span>
+          ) : player.goals > 0 ? (
+            <span className="flex items-center gap-0.5 text-[11px] font-medium text-amber-200/90">
+              <Target className="h-3 w-3" />
+              {player.goals}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {disabled && (
-        <span className="absolute inset-0 flex items-center justify-center bg-slate-950/40 text-xs font-bold uppercase tracking-wide text-slate-300">
-          Picked
+        <span
+          className={[
+            "absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-slate-950/55 text-center text-[11px] font-bold uppercase tracking-wide",
+            overBudget ? "text-amber-300" : "text-slate-300",
+          ].join(" ")}
+        >
+          {disabledLabel}
+          {overBudget && cost != null && (
+            <span className="text-[9px] font-medium normal-case text-amber-200/80">costs ★{cost}</span>
+          )}
         </span>
       )}
     </motion.button>

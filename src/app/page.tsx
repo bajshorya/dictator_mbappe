@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, Dices, Layers, Link2, RefreshCw, Shuffle, Sliders, Trophy, Users, Wand2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, Coins, Dices, Layers, Link2, RefreshCw, Shuffle, Sliders, Trophy, Users, Volume2, VolumeX, Wand2 } from "lucide-react";
 import type { Difficulty, Formation, GameMode, Lineup, Player, Position, Squad, TournamentResult } from "@/lib/types";
 import { FORMATIONS } from "@/data/formations";
 import { simulateTournament, teamStrength } from "@/lib/simulate";
 import { computeChemistry } from "@/lib/chemistry";
-import { getHallOfFame, type HallOfFame } from "@/lib/storage";
+import { BUDGET, canAfford, playerCost, squadCost } from "@/lib/cost";
+import { isMuted, setMuted, sound } from "@/lib/sound";
+import { dailyKey, dailySeed, setSeed } from "@/lib/rng";
+import { getDaily, getHallOfFame, placementRank, saveDaily, type HallOfFame } from "@/lib/storage";
 import { flagFor } from "@/lib/flags";
 import PitchView from "@/components/PitchView";
 import PlayerCard from "@/components/PlayerCard";
@@ -77,7 +80,20 @@ export default function Home() {
   const [result, setResult] = useState<TournamentResult | null>(null);
   const [rerolls, setRerolls] = useState(REROLL_BUDGET.normal);
   const [captainId, setCaptainId] = useState<string | null>(null);
+  const [isDaily, setIsDaily] = useState(false);
+  const [muted, setMutedState] = useState(false);
   const recentNations = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setMutedState(isMuted()), 0);
+    return () => window.clearTimeout(id);
+  }, []);
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    setMutedState(next);
+    if (!next) sound.tap();
+  }
 
   // ---- browser history so the Back button rolls between screens, not off-site ----
   const go = useCallback((p: Phase) => {
@@ -108,6 +124,14 @@ export default function Home() {
   const chemistry = useMemo(() => computeChemistry(xiPlayers), [xiPlayers]);
   const strength = xiCount > 0 ? teamStrength(xiPlayers, benchPlayers, captainId) : 0;
   const selectedPlayer = sel?.player ?? null;
+
+  // Star-points budget
+  const budget = BUDGET[difficulty];
+  const spent = useMemo(() => squadCost([...xiPlayers, ...benchPlayers]), [xiPlayers, benchPlayers]);
+  const affordable = useCallback(
+    (p: Player) => p.id === selectedPlayer?.id || canAfford(p, spent, budget, 11 - xiCount),
+    [spent, budget, xiCount, selectedPlayer],
+  );
 
   // ---- drawing (lazy data) ----
   const draw = useCallback((l: Lineup, b: (Player | undefined)[], f: Formation | null, m: GameMode) => {
@@ -144,6 +168,8 @@ export default function Home() {
     go("formation");
   }
   function chooseFormation(f: Formation) {
+    setSeed(null);
+    setIsDaily(false);
     setFormation(f);
     setLineup({});
     setBench(Array(BENCH_SIZE).fill(undefined));
@@ -164,13 +190,36 @@ export default function Home() {
     setCaptainId(null);
     setResult(null);
     setFormation(null);
+    setIsDaily(false);
+    setSeed(null);
     recentNations.current = new Set();
     go("mode");
   }
 
+  // Daily Challenge — seeded so everyone gets the same draws today.
+  function startDaily() {
+    setSeed(dailySeed());
+    setIsDaily(true);
+    setMode("position");
+    setDifficulty("normal");
+    const f = FORMATIONS.find((x) => x.name === "4-3-3") ?? FORMATIONS[0];
+    setFormation(f);
+    setLineup({});
+    setBench(Array(BENCH_SIZE).fill(undefined));
+    setResult(null);
+    setCaptainId(null);
+    setTactics(0);
+    setRerolls(8);
+    recentNations.current = new Set();
+    go("build");
+    draw({}, Array(BENCH_SIZE).fill(undefined), f, "position");
+  }
+
   function manualReshuffle() {
-    if (rerolls <= 0 || generating) return;
-    setRerolls((r) => r - 1);
+    if (generating) return;
+    if (rerolls <= 0 && !budgetBlocked) return;
+    // Reshuffling is free when you're over budget, so you can never get stuck.
+    if (!budgetBlocked) setRerolls((r) => r - 1);
     draw(lineup, bench, formation, mode);
   }
   function toggleCaptain(playerId: string) {
@@ -273,23 +322,35 @@ export default function Home() {
       const pool = notablePool();
       const used = new Set(placedIds);
       const nl: Lineup = { ...lineup };
+      const nb = [...bench];
+      let spend = spent;
+      const cheapest = (opts: Player[]) => [...opts].sort((a, b) => playerCost(a.rating) - playerCost(b.rating))[0];
+      // Budget-aware pick: prefer a random affordable player, else the cheapest.
+      const pickWithin = (opts: Player[], xiLeft: number) => {
+        const aff = opts.filter((p) => canAfford(p, spend, budget, xiLeft));
+        const choice = aff.length ? aff[Math.floor(Math.random() * aff.length)] : cheapest(opts);
+        if (choice) spend += playerCost(choice.rating);
+        return choice;
+      };
+      const xiOpen = () => formation.slots.filter((s) => !nl[s.id]).length;
       for (const slot of formation.slots) {
         if (nl[slot.id]) continue;
         const opts = pool.filter((p) => p.position === slot.position && !used.has(p.id));
-        const pick = opts[Math.floor(Math.random() * opts.length)];
+        const pick = pickWithin(opts, xiOpen());
         if (pick) {
           nl[slot.id] = pick;
           used.add(pick.id);
         }
       }
-      const nb = [...bench];
       for (let i = 0; i < BENCH_SIZE; i++) {
         if (nb[i]) continue;
-        const opts = pool.filter((p) => !used.has(p.id));
+        const opts = pool.filter((p) => !used.has(p.id) && canAfford(p, spend, budget, 0));
+        if (!opts.length) break; // out of budget for subs
         const pick = opts[Math.floor(Math.random() * opts.length)];
         if (pick) {
           nb[i] = pick;
           used.add(pick.id);
+          spend += playerCost(pick.rating);
         }
       }
       commit(nl, nb);
@@ -300,16 +361,37 @@ export default function Home() {
 
   function runSimulation() {
     if (!xiComplete || result) return;
-    setResult(simulateTournament(xiPlayers, benchPlayers, { captainId, difficulty, tactics }));
+    const seed = isDaily ? dailySeed() + 7 : null; // reproducible result for the daily
+    const r = simulateTournament(xiPlayers, benchPlayers, { captainId, difficulty, tactics, seed });
+    setResult(r);
+    if (isDaily) {
+      const grade = ["F", "F", "E", "D", "C", "B", "A", "S"][placementRank(r.userPlacement)] ?? "F";
+      saveDaily(dailyKey(), { placement: r.userPlacement, won: r.userWon, grade });
+    }
     setPhase("simulating");
   }
 
   const visibleCandidates = candidates.filter((c) => !placedIds.has(c.id));
   const benchEligible = sel != null;
 
+  // Is the budget the reason nothing can be picked right now?
+  const remaining = budget - spent;
+  const pickPool =
+    mode === "nation"
+      ? (nation?.players.filter((p) => !placedIds.has(p.id)) ?? [])
+      : visibleCandidates;
+  const budgetBlocked = !sel && pickPool.length > 0 && pickPool.every((p) => !affordable(p));
+
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:px-6">
-      <header className="mb-7 text-center">
+      <header className="relative mb-7 text-center">
+        <button
+          onClick={toggleMute}
+          title={muted ? "Unmute" : "Mute"}
+          className="absolute right-0 top-0 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10"
+        >
+          {muted ? <VolumeX className="h-4 w-4 text-slate-400" /> : <Volume2 className="h-4 w-4 text-emerald-300" />}
+        </button>
         <button onClick={goHome} className="cursor-pointer font-display text-5xl tracking-tight sm:text-6xl">
           <span className="text-glow text-emerald-400">FOOTY</span>
         </button>
@@ -322,7 +404,7 @@ export default function Home() {
       <AnimatePresence mode="wait">
         {phase === "mode" && (
           <motion.div key="mode" {...fade}>
-            <ModePicker onPick={pickMode} difficulty={difficulty} onDifficulty={setDifficulty} />
+            <ModePicker onPick={pickMode} onDaily={startDaily} difficulty={difficulty} onDifficulty={setDifficulty} />
           </motion.div>
         )}
 
@@ -413,6 +495,24 @@ export default function Home() {
                 <div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-1.5 font-semibold text-slate-300">
+                      <Coins className="h-4 w-4 text-yellow-300" /> Star Budget
+                    </span>
+                    <span className="font-mono text-sm font-bold text-yellow-300">
+                      {budget - spent}
+                      <span className="text-slate-500"> / {budget}</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-amber-500"
+                      animate={{ width: `${Math.min(100, (spent / budget) * 100)}%` }}
+                      transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5 font-semibold text-slate-300">
                       <Link2 className="h-4 w-4 text-violet-300" /> Chemistry
                     </span>
                     <span className="font-mono text-sm font-bold text-violet-300">
@@ -465,11 +565,17 @@ export default function Home() {
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <button
                   onClick={manualReshuffle}
-                  disabled={generating || rerolls <= 0}
+                  disabled={generating || (rerolls <= 0 && !budgetBlocked)}
                   className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 px-5 py-2.5 font-semibold text-emerald-950 shadow-lg shadow-emerald-900/40 transition hover:brightness-110 disabled:opacity-40"
                 >
                   {mode === "nation" ? <Dices className="h-4 w-4" /> : <Shuffle className="h-4 w-4" />}
-                  {generating ? "Drawing…" : mode === "nation" ? "New Nation" : "Reshuffle"}
+                  {generating
+                    ? "Drawing…"
+                    : budgetBlocked && rerolls <= 0
+                      ? "Free reshuffle"
+                      : mode === "nation"
+                        ? "New Nation"
+                        : "Reshuffle"}
                 </button>
                 <span
                   className={[
@@ -502,6 +608,16 @@ export default function Home() {
                 )}
               </AnimatePresence>
 
+              {!generating && budgetBlocked && (
+                <div className="mb-3 rounded-xl bg-amber-400/10 px-3 py-2.5 text-sm text-amber-100 ring-1 ring-amber-300/30">
+                  <strong>Out of star points.</strong> You&apos;ve spent ★{spent} of ★{budget} on big
+                  names — only <strong>★{remaining}</strong> left, and {mode === "nation" ? "every remaining player in this squad" : "every player drawn"}{" "}
+                  costs more than that. You front-loaded too many stars: hit{" "}
+                  <strong>{mode === "nation" ? "New Nation" : "Reshuffle"}</strong> for cheaper
+                  options{xiComplete ? "" : ", or fill your remaining starters with budget players"}.
+                </div>
+              )}
+
               {generating ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -512,6 +628,7 @@ export default function Home() {
                 <NationSquadPanel
                   squad={nation}
                   takenIds={placedIds}
+                  affordable={affordable}
                   selectedId={sel?.origin.kind === "draw" ? selectedPlayer?.id ?? null : null}
                   onPick={selectFromDraw}
                 />
@@ -529,6 +646,9 @@ export default function Home() {
                           key={c.id}
                           player={c}
                           selected={c.id === selectedPlayer?.id && sel?.origin.kind === "draw"}
+                          disabled={!affordable(c)}
+                          disabledLabel="Over budget"
+                          cost={playerCost(c.rating)}
                           size="sm"
                           onClick={() => selectFromDraw(c)}
                         />
@@ -655,16 +775,22 @@ function EmptyHint({ title, text }: { title: string; text: string }) {
 
 function ModePicker({
   onPick,
+  onDaily,
   difficulty,
   onDifficulty,
 }: {
   onPick: (m: GameMode) => void;
+  onDaily: () => void;
   difficulty: Difficulty;
   onDifficulty: (d: Difficulty) => void;
 }) {
   const [hof, setHof] = useState<HallOfFame | null>(null);
+  const [daily, setDaily] = useState<ReturnType<typeof getDaily>>(null);
   useEffect(() => {
-    const id = window.setTimeout(() => setHof(getHallOfFame()), 0);
+    const id = window.setTimeout(() => {
+      setHof(getHallOfFame());
+      setDaily(getDaily(dailyKey()));
+    }, 0);
     return () => window.clearTimeout(id);
   }, []);
 
@@ -715,6 +841,31 @@ function ModePicker({
           )}
         </div>
       )}
+
+      {/* Daily Challenge */}
+      <div className="mx-auto mb-6 max-w-2xl">
+        <button
+          onClick={onDaily}
+          className="group flex w-full items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600/30 to-fuchsia-600/20 p-4 text-left ring-1 ring-violet-400/40 transition hover:ring-violet-300/70"
+        >
+          <div className="flex items-center gap-3">
+            <CalendarDays className="h-7 w-7 text-violet-200" />
+            <div>
+              <div className="font-display text-lg">Daily Challenge</div>
+              <div className="text-xs text-slate-300">
+                Same seeded draws for everyone today · 4-3-3 · 8 rerolls
+              </div>
+            </div>
+          </div>
+          {daily ? (
+            <span className="rounded-full bg-black/30 px-3 py-1 text-xs font-semibold text-emerald-300">
+              Today: {daily.grade} · {daily.placement.replace("Eliminated in the ", "")}
+            </span>
+          ) : (
+            <span className="rounded-full bg-violet-400/20 px-3 py-1 text-xs font-bold text-violet-100">Play ▸</span>
+          )}
+        </button>
+      </div>
 
       <div className="mb-6 flex flex-col items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Difficulty</span>

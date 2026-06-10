@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Anton, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-sans",
@@ -19,9 +20,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Footy — All-Time XI Builder",
+  metadataBase: new URL("https://footy.example"),
+  title: "Footy — All-Time World Cup XI Builder",
   description:
-    "Draft an all-time XI from legendary tournament performances, then simulate a World Cup and try to win it all.",
+    "Draft an all-time XI from 1982–2022 World Cup legends, then simulate the tournament and try to win it all.",
+  applicationName: "Footy",
+  appleWebApp: { capable: true, title: "Footy", statusBarStyle: "black-translucent" },
+  openGraph: {
+    title: "Footy — All-Time World Cup XI Builder",
+    description: "Draft an all-time World Cup XI and win the tournament.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Footy — All-Time World Cup XI Builder",
+    description: "Draft an all-time World Cup XI and win the tournament.",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#05070d",
 };
 
 export default function RootLayout({
@@ -36,6 +54,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

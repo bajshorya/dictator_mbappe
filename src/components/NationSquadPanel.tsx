@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import type { Player, Squad } from "@/lib/types";
 import { flagFor } from "@/lib/flags";
+import { playerCost } from "@/lib/cost";
 import PlayerCard from "@/components/PlayerCard";
 
 const FINISH_COLOR: Record<string, string> = {
@@ -17,9 +18,10 @@ interface Props {
   takenIds: Set<string>;
   selectedId: string | null;
   onPick: (p: Player) => void;
+  affordable?: (p: Player) => boolean;
 }
 
-export default function NationSquadPanel({ squad, takenIds, selectedId, onPick }: Props) {
+export default function NationSquadPanel({ squad, takenIds, selectedId, onPick, affordable }: Props) {
   return (
     <motion.div
       key={`${squad.team}-${squad.year}`}
@@ -46,14 +48,22 @@ export default function NationSquadPanel({ squad, takenIds, selectedId, onPick }
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         {squad.players.map((p) => (
-          <PlayerCard
-            key={p.id}
-            player={p}
-            size="sm"
-            disabled={takenIds.has(p.id)}
-            selected={p.id === selectedId}
-            onClick={() => onPick(p)}
-          />
+          {(() => {
+            const taken = takenIds.has(p.id);
+            const tooPricey = !taken && affordable ? !affordable(p) : false;
+            return (
+              <PlayerCard
+                key={p.id}
+                player={p}
+                size="sm"
+                disabled={taken || tooPricey}
+                disabledLabel={taken ? "Picked" : "Over budget"}
+                cost={playerCost(p.rating)}
+                selected={p.id === selectedId}
+                onClick={() => onPick(p)}
+              />
+            );
+          })()}
         ))}
       </div>
     </motion.div>

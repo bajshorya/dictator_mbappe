@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import type { MatchResult } from "@/lib/types";
 import { teamFlag } from "@/lib/flags";
+import { sound } from "@/lib/sound";
 import { USER_TEAM_NAME } from "@/data/teams";
 
 function placeMakes(n: number): boolean[] {
@@ -57,9 +58,16 @@ export default function Shootout({ match, onDone }: Props) {
   const finished = step >= 10;
   const yourTurn = step % 2 === 0;
 
+  useEffect(() => {
+    if (finished) (userWon ? sound.win : sound.lose)();
+  }, [finished, userWon]);
+
   function tap() {
     if (finished) return;
     const made = yourTurn ? script.user[userTaken] : script.opp[oppTaken];
+    const goodForUser = yourTurn ? made : !made;
+    if (goodForUser) sound.goal();
+    else sound.miss();
     setFlash(yourTurn ? (made ? "GOAL!" : "Saved!") : made ? "Scored" : "SAVED!");
     setStep((s) => s + 1);
     window.setTimeout(() => setFlash(null), 700);

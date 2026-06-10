@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { toPng } from "html-to-image";
-import { BarChart3, Download, Layers, RotateCcw, Share2, Swords, Trophy } from "lucide-react";
+import { Award, BarChart3, Download, Layers, RotateCcw, Share2, Swords, Trophy } from "lucide-react";
 import type { Difficulty, Formation, MatchResult, Player, TournamentResult } from "@/lib/types";
 import { USER_TEAM_NAME } from "@/data/teams";
 import { flagFor, teamFlag } from "@/lib/flags";
@@ -11,6 +11,7 @@ import { computeChemistry } from "@/lib/chemistry";
 import { teamStrength } from "@/lib/simulate";
 import { placementRank, recordResult } from "@/lib/storage";
 import ShareCard from "@/components/ShareCard";
+import BracketView from "@/components/BracketView";
 
 function Scoreline({ m, showScorers }: { m: MatchResult; showScorers?: boolean }) {
   const userIsHome = m.home === USER_TEAM_NAME;
@@ -175,6 +176,22 @@ export default function ResultsView({ result, xi, formation, captainId, difficul
         )}
       </motion.div>
 
+      {result.tournamentMvp && (
+        <div className="glass flex items-center gap-3 rounded-2xl p-4">
+          <Award className="h-8 w-8 shrink-0 text-violet-300" />
+          <div>
+            <div className="text-[11px] uppercase tracking-widest text-slate-400">Player of the Tournament</div>
+            <div className="font-display text-xl">
+              {flagFor(result.tournamentMvp.team)} {result.tournamentMvp.name}{" "}
+              <span className="text-sm text-emerald-300">WC {result.tournamentMvp.year}</span>
+            </div>
+            <div className="text-xs text-slate-400">
+              {result.tournamentMvp.motm} MOTM · {result.tournamentMvp.goals} goals · {result.tournamentMvp.apps} apps
+            </div>
+          </div>
+        </div>
+      )}
+
       <Section icon={Swords} title="Your Run">
         <div className="space-y-2">
           {result.userPath.length === 0 ? (
@@ -218,9 +235,15 @@ export default function ResultsView({ result, xi, formation, captainId, difficul
         </div>
       </Section>
 
+      <Section icon={Layers} title="Knockout Bracket">
+        <div className="glass rounded-xl p-3">
+          <BracketView koRounds={result.rounds.filter((r) => r.name !== "Group Stage")} />
+        </div>
+      </Section>
+
       <details className="glass rounded-xl">
         <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-semibold">
-          <Layers className="h-4 w-4 text-emerald-300" /> Full tournament results
+          <Layers className="h-4 w-4 text-emerald-300" /> All match results
         </summary>
         <div className="space-y-4 px-4 pb-4">
           {result.rounds.map((round) => (
