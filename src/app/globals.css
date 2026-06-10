@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #05070d;
+  --foreground: #eef2f7;
+  --accent: #34d399;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100dvh;
+  background-color: #05070d;
+  background-image:
+    radial-gradient(60% 50% at 12% 0%, rgba(52, 211, 153, 0.16), transparent 70%),
+    radial-gradient(50% 45% at 90% 5%, rgba(99, 102, 241, 0.18), transparent 70%),
+    radial-gradient(55% 50% at 50% 100%, rgba(6, 182, 212, 0.12), transparent 70%);
+  background-attachment: fixed;
+}
+
+.font-display {
+  font-family: var(--font-display), system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.text-glow {
+  text-shadow: 0 0 24px rgba(52, 211, 153, 0.5);
+}
+
+/* Glassmorphism panel */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Loading shimmer */
+.shimmer {
+  background: linear-gradient(110deg, #131a26 8%, #1f2937 18%, #131a26 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
+/* Glowing target slot */
+.slot-open {
+  animation: glow 1.5s ease-in-out infinite;
+}
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.55), 0 0 14px rgba(250, 204, 21, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 1), 0 0 28px rgba(250, 204, 21, 0.65);
+  }
+}
+
+/* ---------- football pitch ---------- */
+.pitch {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    #0f7a43 0,
+    #0f7a43 8.33%,
+    #128a4b 8.33%,
+    #128a4b 16.66%
+  );
+}
+.pitch::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+}
+.pitch::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  border-top: 2px solid rgba(255, 255, 255, 0.45);
+}
+.pitch-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+}
+/* penalty boxes top & bottom */
+.pitch-box {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 46%;
+  height: 14%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+}
+.pitch-box.top {
+  top: 7px;
+  border-top: none;
+}
+.pitch-box.bottom {
+  bottom: 7px;
+  border-bottom: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #283041;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
 }
