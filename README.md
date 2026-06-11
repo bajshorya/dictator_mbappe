@@ -14,6 +14,7 @@ set your tactics — then watch your team battle through a 48-team World Cup, pe
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38bdf8?logo=tailwindcss&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
 </div>
 
@@ -100,9 +101,9 @@ public/           # icon, service worker
 
 ## 📜 License & attribution
 
+- **Code** is licensed under the **[MIT License](LICENSE)**.
 - **Squad data** is derived from the [Fjelstul World Cup Database](https://github.com/jfjelstul/worldcup), licensed **CC-BY-SA 4.0** — any redistribution of the data must keep that license and attribution.
 - Player flags are emoji; nations and ratings are for a game, not an official record.
-- Code license: _add a `LICENSE` file (MIT recommended)._
 
 ## 🙌 Credits
 
