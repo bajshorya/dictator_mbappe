@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CalendarDays, ChevronLeft, Coins, Dices, Layers, Link2, RefreshCw, Shuffle, Sliders, Trophy, Users, Volume2, VolumeX, Wand2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, Coins, Dices, HelpCircle, Layers, Link2, PlusCircle, RefreshCw, Shuffle, Sliders, Sparkles, Trophy, Users, Volume2, VolumeX, Wand2 } from "lucide-react";
 import type { Difficulty, Formation, GameMode, Lineup, Player, Position, Squad, TournamentResult } from "@/lib/types";
 import { FORMATIONS } from "@/data/formations";
 import { simulateTournament, teamStrength } from "@/lib/simulate";
@@ -17,6 +17,9 @@ import PlayerCard from "@/components/PlayerCard";
 import NationSquadPanel from "@/components/NationSquadPanel";
 import ResultsView from "@/components/ResultsView";
 import SimulationView from "@/components/SimulationView";
+import HowToPlay from "@/components/HowToPlay";
+
+const HOWTO_KEY = "footy:howto";
 
 type Phase = "mode" | "formation" | "build" | "simulating" | "results";
 type Loc = { kind: "xi"; slotId: string } | { kind: "bench"; index: number };
@@ -82,7 +85,26 @@ export default function Home() {
   const [captainId, setCaptainId] = useState<string | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [muted, setMutedState] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
+  const [subsMode, setSubsMode] = useState(false);
   const recentNations = useRef<Set<string>>(new Set());
+
+  // Show the how-to once (first time entering the build screen).
+  function maybeShowHowTo() {
+    try {
+      if (window.localStorage.getItem(HOWTO_KEY) !== "1") setShowHowTo(true);
+    } catch {
+      /* ignore */
+    }
+  }
+  function closeHowTo() {
+    setShowHowTo(false);
+    try {
+      window.localStorage.setItem(HOWTO_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     const id = window.setTimeout(() => setMutedState(isMuted()), 0);
@@ -116,10 +138,6 @@ export default function Home() {
   const placedIds = useMemo(() => new Set([...xiPlayers, ...benchPlayers].map((p) => p.id)), [xiPlayers, benchPlayers]);
   const xiCount = xiPlayers.length;
   const benchCount = benchPlayers.length;
-  const openNeed = useMemo(
-    () => (formation ? needFor(lineup, formation) : { GK: 0, DEF: 0, MID: 0, FWD: 0 }),
-    [formation, lineup],
-  );
   const xiComplete = xiCount === 11;
   const chemistry = useMemo(() => computeChemistry(xiPlayers), [xiPlayers]);
   const strength = xiCount > 0 ? teamStrength(xiPlayers, benchPlayers, captainId) : 0;
@@ -134,33 +152,45 @@ export default function Home() {
   );
 
   // ---- drawing (lazy data) ----
-  const draw = useCallback((l: Lineup, b: (Player | undefined)[], f: Formation | null, m: GameMode) => {
-    setSel(null);
-    setGenerating(true);
-    const placed = new Set(
-      [...(Object.values(l).filter(Boolean) as Player[]), ...(b.filter(Boolean) as Player[])].map((p) => p.id),
-    );
-    loadDraft().then((draftMod) => {
-      window.setTimeout(() => {
-        if (m === "nation") {
-          const sq = draftMod.drawNationSquad(recentNations.current);
-          recentNations.current.add(`${sq.team}-${sq.year}`);
-          if (recentNations.current.size > 12) {
-            recentNations.current = new Set([...recentNations.current].slice(-12));
+  // `subs` = we're explicitly adding substitutes (XI already complete).
+  const draw = useCallback(
+    (l: Lineup, b: (Player | undefined)[], f: Formation | null, m: GameMode, subs: boolean) => {
+      setSel(null);
+      setGenerating(true);
+      const placed = new Set(
+        [...(Object.values(l).filter(Boolean) as Player[]), ...(b.filter(Boolean) as Player[])].map((p) => p.id),
+      );
+      const need = f ? needFor(l, f) : { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+      const open = need.GK + need.DEF + need.MID + need.FWD;
+      const benchFilled = (b.filter(Boolean) as Player[]).length;
+      loadDraft().then((draftMod) => {
+        window.setTimeout(() => {
+          if (open > 0) {
+            // still drafting the XI
+            if (m === "nation") {
+              const sq = draftMod.drawNationSquad(recentNations.current);
+              recentNations.current.add(`${sq.team}-${sq.year}`);
+              if (recentNations.current.size > 12) {
+                recentNations.current = new Set([...recentNations.current].slice(-12));
+              }
+              setNation(sq);
+            } else {
+              setCandidates(draftMod.generateCandidates(need, placed));
+            }
+          } else if (subs && benchFilled < BENCH_SIZE) {
+            setNation(null);
+            setCandidates(draftMod.generateBench(6, placed));
+          } else {
+            // XI complete and not adding subs → clear the board, show kickoff
+            setNation(null);
+            setCandidates([]);
           }
-          setNation(sq);
-        } else if (f) {
-          const need = needFor(l, f);
-          const open = need.GK + need.DEF + need.MID + need.FWD;
-          const benchFilled = (b.filter(Boolean) as Player[]).length;
-          if (open > 0) setCandidates(draftMod.generateCandidates(need, placed));
-          else if (benchFilled < BENCH_SIZE) setCandidates(draftMod.generateBench(6, placed));
-          else setCandidates([]);
-        }
-        setGenerating(false);
-      }, 340);
-    });
-  }, []);
+          setGenerating(false);
+        }, 340);
+      });
+    },
+    [],
+  );
 
   // ---- navigation ----
   function pickMode(m: GameMode) {
@@ -176,10 +206,12 @@ export default function Home() {
     setResult(null);
     setCaptainId(null);
     setTactics(0);
+    setSubsMode(false);
     setRerolls(REROLL_BUDGET[difficulty]);
     recentNations.current = new Set();
     go("build");
-    draw({}, Array(BENCH_SIZE).fill(undefined), f, mode);
+    maybeShowHowTo();
+    draw({}, Array(BENCH_SIZE).fill(undefined), f, mode, false);
   }
   function goHome() {
     setLineup({});
@@ -191,9 +223,20 @@ export default function Home() {
     setResult(null);
     setFormation(null);
     setIsDaily(false);
+    setSubsMode(false);
     setSeed(null);
     recentNations.current = new Set();
     go("mode");
+  }
+
+  function startAddSubs() {
+    setSubsMode(true);
+    draw(lineup, bench, formation, mode, true);
+  }
+  function finishSubs() {
+    setSubsMode(false);
+    setSel(null);
+    setCandidates([]);
   }
 
   // Daily Challenge — seeded so everyone gets the same draws today.
@@ -209,10 +252,12 @@ export default function Home() {
     setResult(null);
     setCaptainId(null);
     setTactics(0);
+    setSubsMode(false);
     setRerolls(8);
     recentNations.current = new Set();
     go("build");
-    draw({}, Array(BENCH_SIZE).fill(undefined), f, "position");
+    maybeShowHowTo();
+    draw({}, Array(BENCH_SIZE).fill(undefined), f, "position", false);
   }
 
   function manualReshuffle() {
@@ -220,7 +265,7 @@ export default function Home() {
     if (rerolls <= 0 && !budgetBlocked) return;
     // Reshuffling is free when you're over budget, so you can never get stuck.
     if (!budgetBlocked) setRerolls((r) => r - 1);
-    draw(lineup, bench, formation, mode);
+    draw(lineup, bench, formation, mode, subsMode);
   }
   function toggleCaptain(playerId: string) {
     setCaptainId((cur) => (cur === playerId ? null : playerId));
@@ -265,7 +310,7 @@ export default function Home() {
     if (origin.kind === "draw") {
       const nl = { ...lineup, [slotId]: p };
       commit(nl, bench);
-      draw(nl, bench, formation, mode);
+      draw(nl, bench, formation, mode, subsMode);
     } else {
       const nl = { ...lineup };
       const nb = [...bench];
@@ -301,7 +346,14 @@ export default function Home() {
       const nb = [...bench];
       nb[index] = p;
       commit(lineup, nb);
-      draw(lineup, nb, formation, mode);
+      const benchFull = (nb.filter(Boolean) as Player[]).length >= BENCH_SIZE;
+      if (benchFull) {
+        setSubsMode(false);
+        setSel(null);
+        setCandidates([]);
+      } else {
+        draw(lineup, nb, formation, mode, true);
+      }
     } else {
       const nl = { ...lineup };
       const nb = [...bench];
@@ -374,13 +426,18 @@ export default function Home() {
   const visibleCandidates = candidates.filter((c) => !placedIds.has(c.id));
   const benchEligible = sel != null;
 
+  // What does the draft panel show right now?
+  const showReady = xiComplete && !subsMode; // XI done → kickoff screen (cards hidden)
+  const showNation = mode === "nation" && !xiComplete && !subsMode;
+  const showToolbar = !showReady;
+
   // Is the budget the reason nothing can be picked right now?
   const remaining = budget - spent;
   const pickPool =
-    mode === "nation"
+    showNation
       ? (nation?.players.filter((p) => !placedIds.has(p.id)) ?? [])
       : visibleCandidates;
-  const budgetBlocked = !sel && pickPool.length > 0 && pickPool.every((p) => !affordable(p));
+  const budgetBlocked = !showReady && !sel && pickPool.length > 0 && pickPool.every((p) => !affordable(p));
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:px-6">
@@ -388,16 +445,17 @@ export default function Home() {
         <button
           onClick={toggleMute}
           title={muted ? "Unmute" : "Mute"}
-          className="absolute right-0 top-0 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10"
+          className="absolute right-0 top-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10"
         >
           {muted ? <VolumeX className="h-4 w-4 text-slate-400" /> : <Volume2 className="h-4 w-4 text-emerald-300" />}
         </button>
-        <button onClick={goHome} className="cursor-pointer font-display text-5xl tracking-tight sm:text-6xl">
-          <span className="text-glow text-emerald-400">FOOTY</span>
+        <button onClick={goHome} className="group cursor-pointer">
+          <span className="headline block text-4xl leading-none sm:text-5xl">
+            <span className="brand-gradient">DICTATOR</span>{" "}
+            <span className="text-slate-50 text-stroke">MBAPPÉ</span>
+            <span className="ml-1 inline-block text-emerald-400 transition group-hover:rotate-12">⚽</span>
+          </span>
         </button>
-        <p className="mt-1 text-sm text-slate-400">
-          Draft an all-time World Cup squad from the legends of 1982–2022 — then win it all
-        </p>
         <Stepper phase={phase} />
       </header>
 
@@ -435,9 +493,18 @@ export default function Home() {
                     XI {xiCount}/11 · Subs {benchCount}/{BENCH_SIZE}
                   </span>
                 </div>
-                <span className="rounded-full bg-rose-500/10 px-3 py-1 text-[11px] font-semibold text-rose-200 ring-1 ring-rose-400/20">
-                  One shot · no re-sim
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-rose-500/10 px-3 py-1 text-[11px] font-semibold text-rose-200 ring-1 ring-rose-400/20">
+                    One shot · no re-sim
+                  </span>
+                  <button
+                    onClick={() => setShowHowTo(true)}
+                    title="How to play"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10 transition hover:bg-white/10"
+                  >
+                    <HelpCircle className="h-4 w-4 text-slate-300" />
+                  </button>
+                </div>
               </div>
 
               <PitchView
@@ -562,37 +629,48 @@ export default function Home() {
 
             {/* Draft panel */}
             <div>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <button
-                  onClick={manualReshuffle}
-                  disabled={generating || (rerolls <= 0 && !budgetBlocked)}
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 px-5 py-2.5 font-semibold text-emerald-950 shadow-lg shadow-emerald-900/40 transition hover:brightness-110 disabled:opacity-40"
-                >
-                  {mode === "nation" ? <Dices className="h-4 w-4" /> : <Shuffle className="h-4 w-4" />}
-                  {generating
-                    ? "Drawing…"
-                    : budgetBlocked && rerolls <= 0
-                      ? "Free reshuffle"
-                      : mode === "nation"
-                        ? "New Nation"
-                        : "Reshuffle"}
-                </button>
-                <span
-                  className={[
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold ring-1",
-                    rerolls <= 2 ? "bg-rose-500/15 text-rose-200 ring-rose-400/30" : "bg-white/5 text-slate-300 ring-white/10",
-                  ].join(" ")}
-                  title="Manual rerolls left (placing a player draws the next set free)"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" /> {rerolls} left
-                </span>
-                <button
-                  onClick={autoFillRest}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2.5 text-sm font-semibold ring-1 ring-white/10 transition hover:bg-white/10"
-                >
-                  <Wand2 className="h-4 w-4" /> Auto-fill
-                </button>
-              </div>
+              {showToolbar && (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={manualReshuffle}
+                    disabled={generating || (rerolls <= 0 && !budgetBlocked)}
+                    className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 px-5 py-2.5 font-semibold text-emerald-950 shadow-lg shadow-emerald-900/40 transition hover:brightness-110 disabled:opacity-40"
+                  >
+                    {mode === "nation" && !subsMode ? <Dices className="h-4 w-4" /> : <Shuffle className="h-4 w-4" />}
+                    {generating
+                      ? "Drawing…"
+                      : budgetBlocked && rerolls <= 0
+                        ? "Free reshuffle"
+                        : mode === "nation" && !subsMode
+                          ? "New Nation"
+                          : "Reshuffle"}
+                  </button>
+                  <span
+                    className={[
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold ring-1",
+                      rerolls <= 2 ? "bg-rose-500/15 text-rose-200 ring-rose-400/30" : "bg-white/5 text-slate-300 ring-white/10",
+                    ].join(" ")}
+                    title="Manual rerolls left (placing a player draws the next set free)"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> {rerolls} left
+                  </span>
+                  {!subsMode ? (
+                    <button
+                      onClick={autoFillRest}
+                      className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2.5 text-sm font-semibold ring-1 ring-white/10 transition hover:bg-white/10"
+                    >
+                      <Wand2 className="h-4 w-4" /> Auto-fill
+                    </button>
+                  ) : (
+                    <button
+                      onClick={finishSubs}
+                      className="inline-flex items-center gap-2 rounded-full bg-yellow-400/90 px-4 py-2.5 text-sm font-bold text-amber-950 transition hover:brightness-110"
+                    >
+                      <Trophy className="h-4 w-4" /> Done — to kickoff
+                    </button>
+                  )}
+                </div>
+              )}
 
               <AnimatePresence>
                 {selectedPlayer && (
@@ -624,7 +702,18 @@ export default function Home() {
                     <div key={i} className="shimmer h-36 rounded-2xl" />
                   ))}
                 </div>
-              ) : mode === "nation" && nation ? (
+              ) : showReady ? (
+                <KickoffPanel
+                  strength={strength}
+                  chemistry={chemistry.score}
+                  benchCount={benchCount}
+                  benchSize={BENCH_SIZE}
+                  captainName={captainId ? (xiPlayers.find((p) => p.id === captainId)?.name ?? null) : null}
+                  tacticsLabel={tactics < -0.33 ? "Defensive" : tactics > 0.33 ? "Attacking" : "Balanced"}
+                  onSimulate={runSimulation}
+                  onAddSubs={startAddSubs}
+                />
+              ) : showNation && nation ? (
                 <NationSquadPanel
                   squad={nation}
                   takenIds={placedIds}
@@ -635,9 +724,7 @@ export default function Home() {
               ) : visibleCandidates.length > 0 ? (
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {openNeed.GK + openNeed.DEF + openNeed.MID + openNeed.FWD > 0
-                      ? "Pick for your XI"
-                      : "Pick your substitutes"}
+                    {subsMode ? "Pick your substitutes" : "Pick for your XI"}
                   </p>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <AnimatePresence mode="popLayout">
@@ -657,28 +744,7 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <EmptyHint
-                  title={xiComplete && benchCount >= BENCH_SIZE ? "Squad complete" : "No draw"}
-                  text={
-                    xiComplete && benchCount >= BENCH_SIZE
-                      ? "Your 18 are ready — kick off the World Cup below."
-                      : "Hit the draw button for a fresh set."
-                  }
-                />
-              )}
-
-              <button
-                onClick={runSimulation}
-                disabled={!xiComplete}
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-500 px-6 py-4 text-lg font-bold text-amber-950 shadow-xl shadow-amber-900/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                <Trophy className="h-5 w-5" />
-                {xiComplete ? "Simulate the World Cup" : `Fill ${11 - xiCount} more starters`}
-              </button>
-              {xiComplete && benchCount < BENCH_SIZE && (
-                <p className="mt-2 text-center text-xs text-slate-500">
-                  You can play now, or add {BENCH_SIZE - benchCount} more subs for bench depth.
-                </p>
+                <EmptyHint title="No draw" text="Hit the draw button for a fresh set." />
               )}
             </div>
           </motion.div>
@@ -704,9 +770,30 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      <footer className="mt-12 pb-6 text-center text-xs text-slate-600">
-        Squad data: Fjelstul World Cup Database (CC-BY-SA). Ratings reflect each player&apos;s performance in
-        that specific World Cup.
+      <AnimatePresence>{showHowTo && <HowToPlay onClose={closeHowTo} />}</AnimatePresence>
+
+      <footer className="mt-14 border-t border-white/5 pt-6 pb-8 text-center text-xs text-slate-500">
+        <p className="text-sm">
+          Built by{" "}
+          <span className="font-semibold brand-gradient">Shorya Baj</span>
+        </p>
+        <p className="mt-1.5">
+          <a
+            href="https://github.com/bajshorya/dictator_mbappe"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 font-medium text-slate-300 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+            </svg>
+            Open source on GitHub
+          </a>
+        </p>
+        <p className="mt-3 text-[11px] text-slate-600">
+          Squad data: Fjelstul World Cup Database (CC-BY-SA). Ratings reflect each player&apos;s
+          performance in that specific World Cup.
+        </p>
       </footer>
     </main>
   );
@@ -773,6 +860,79 @@ function EmptyHint({ title, text }: { title: string; text: string }) {
   );
 }
 
+function KickoffPanel({
+  strength,
+  chemistry,
+  benchCount,
+  benchSize,
+  captainName,
+  tacticsLabel,
+  onSimulate,
+  onAddSubs,
+}: {
+  strength: number;
+  chemistry: number;
+  benchCount: number;
+  benchSize: number;
+  captainName: string | null;
+  tacticsLabel: string;
+  onSimulate: () => void;
+  onAddSubs: () => void;
+}) {
+  const stats = [
+    { label: "Strength", value: strength, color: "text-emerald-300" },
+    { label: "Chemistry", value: chemistry, color: "text-violet-300" },
+    { label: "Subs", value: `${benchCount}/${benchSize}`, color: "text-sky-300" },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 220, damping: 20 }}
+      className="surface relative overflow-hidden rounded-3xl p-6 text-center"
+    >
+      <motion.div
+        className="floaty pointer-events-none absolute -right-6 -top-6 text-7xl opacity-20"
+        aria-hidden
+      >
+        ⚽
+      </motion.div>
+      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-emerald-300">
+        <Sparkles className="h-3.5 w-3.5" /> Squad locked in
+      </div>
+      <h3 className="headline mt-3 text-3xl">Ready for kickoff</h3>
+      <p className="mt-1 text-sm text-slate-400">
+        {tacticsLabel} setup{captainName ? ` · ©️ ${captainName}` : ""}
+      </p>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        {stats.map((s) => (
+          <div key={s.label} className="rounded-xl bg-white/5 px-2 py-2.5 ring-1 ring-white/10">
+            <div className="text-[10px] uppercase tracking-wide text-slate-400">{s.label}</div>
+            <div className={`font-mono text-xl font-black ${s.color}`}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={onSimulate}
+        className="btn-hero headline mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-2xl"
+      >
+        <Trophy className="h-6 w-6" /> RULE THE WORLD CUP
+      </button>
+
+      {benchCount < benchSize && (
+        <button
+          onClick={onAddSubs}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-300 transition hover:text-white"
+        >
+          <PlusCircle className="h-4 w-4" /> Add {benchSize - benchCount} substitute{benchSize - benchCount === 1 ? "" : "s"} (optional)
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
 function ModePicker({
   onPick,
   onDaily,
@@ -794,22 +954,45 @@ function ModePicker({
     return () => window.clearTimeout(id);
   }, []);
 
-  const cards: { mode: GameMode; icon: typeof Shuffle; title: string; desc: string }[] = [
+  const cards: { mode: GameMode; icon: typeof Shuffle; title: string; desc: string; chip: string; ring: string }[] = [
     {
       mode: "position",
       icon: Layers,
       title: "Position Draft",
-      desc: "Each draw offers a player for every open spot. Pick one, place him, and a fresh set appears — build your XI and bench position by position.",
+      desc: "Each draw offers a player for every open spot. Pick one, place him, and a fresh set appears — build your XI position by position.",
+      chip: "bg-emerald-400/15 text-emerald-300",
+      ring: "hover:ring-emerald-400/70",
     },
     {
       mode: "nation",
       icon: Users,
       title: "By Nation",
-      desc: "Each draw shows a full national squad from a random World Cup. Take one player from it, then a new nation appears. Assemble your dream squad from across the world.",
+      desc: "Each draw shows a full national squad from a random World Cup. Take one player, then a new nation appears. Build a squad from across the globe.",
+      chip: "bg-sky-400/15 text-sky-300",
+      ring: "hover:ring-sky-400/70",
     },
   ];
+  const legends =
+    "Maradona ’86 · Messi ’22 · Ronaldo ’02 · Zidane ’98 · Mbappé ’18 · Pelé-era greats · Cannavaro ’06 · Iniesta ’10 · Schillaci ’90 · Romário ’94 · Modrić ’18 · Müller ’14 · Baggio ’94 · Klose · Suárez · ";
   return (
     <div>
+      {/* Hero */}
+      <div className="mb-8 text-center">
+        <h1 className="headline text-balance text-3xl sm:text-5xl">
+          Assemble the greatest <span className="brand-gradient">World Cup XI</span> ever assembled.
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-slate-400 sm:text-base">
+          Draft legends from 1982–2022, build chemistry, set your tactics — then watch your dream
+          squad rule a 48-team World Cup. One shot. No mercy.
+        </p>
+        <div className="marquee mt-5 text-sm font-semibold text-slate-500">
+          <div>
+            {legends}
+            {legends}
+          </div>
+        </div>
+      </div>
+
       {hof && hof.plays > 0 && (
         <div className="glass mx-auto mb-6 max-w-2xl rounded-2xl p-4">
           <div className="mb-2 flex items-center justify-between">
@@ -897,12 +1080,18 @@ function ModePicker({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }}
             whileHover={{ y: -6 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => onPick(c.mode)}
-            className="glass rounded-2xl p-6 text-left transition hover:ring-emerald-400/60"
+            className={`surface group rounded-2xl p-6 text-left transition ${c.ring}`}
           >
-            <c.icon className="h-8 w-8 text-emerald-300" />
-            <h3 className="font-display mt-3 text-2xl">{c.title}</h3>
+            <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${c.chip}`}>
+              <c.icon className="h-6 w-6" />
+            </div>
+            <h3 className="headline mt-4 text-2xl">{c.title}</h3>
             <p className="mt-2 text-sm text-slate-400">{c.desc}</p>
+            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-300 transition group-hover:gap-2 group-hover:text-white">
+              Start drafting →
+            </span>
           </motion.button>
         ))}
       </div>
@@ -914,7 +1103,8 @@ function FormationPicker({ onChoose }: { onChoose: (f: Formation) => void }) {
   const empty: Lineup = {};
   return (
     <div>
-      <h2 className="mb-5 text-center text-lg font-semibold text-slate-200">Pick your shape</h2>
+      <h2 className="headline mb-1 text-center text-3xl">Pick your shape</h2>
+      <p className="mb-5 text-center text-sm text-slate-400">Your formation sets the slots you’ll draft into.</p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {FORMATIONS.map((f, i) => {
           const counts = POSITIONS.map((p) => `${f.slots.filter((s) => s.position === p).length}${p[0]}`);
@@ -925,14 +1115,15 @@ function FormationPicker({ onChoose }: { onChoose: (f: Formation) => void }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               whileHover={{ y: -6 }}
+              whileTap={{ scale: 0.98 }}
               role="button"
               tabIndex={0}
               onClick={() => onChoose(f)}
               onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onChoose(f)}
-              className="glass group cursor-pointer rounded-2xl p-3 transition hover:ring-emerald-400/60"
+              className="surface group cursor-pointer rounded-2xl p-3 transition hover:ring-emerald-400/70"
             >
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-display text-2xl text-emerald-300">{f.name}</span>
+                <span className="headline text-2xl brand-gradient">{f.name}</span>
                 <span className="font-mono text-[10px] text-slate-500">{counts.join(" ")}</span>
               </div>
               <div className="pointer-events-none mx-auto max-w-[150px]">

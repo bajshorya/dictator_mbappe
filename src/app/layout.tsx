@@ -20,21 +20,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://footy.example"),
-  title: "Footy — All-Time World Cup XI Builder",
+  metadataBase: new URL("https://dictator-mbappe.vercel.app"),
+  title: "Dictator Mbappé — All-Time World Cup XI Builder",
   description:
-    "Draft an all-time XI from 1982–2022 World Cup legends, then simulate the tournament and try to win it all.",
-  applicationName: "Footy",
-  appleWebApp: { capable: true, title: "Footy", statusBarStyle: "black-translucent" },
+    "Draft an all-time XI from 1982–2022 World Cup legends, then rule the tournament and try to win it all.",
+  applicationName: "Dictator Mbappé",
+  appleWebApp: { capable: true, title: "Dictator Mbappé", statusBarStyle: "black-translucent" },
   openGraph: {
-    title: "Footy — All-Time World Cup XI Builder",
-    description: "Draft an all-time World Cup XI and win the tournament.",
+    title: "Dictator Mbappé — All-Time World Cup XI Builder",
+    description: "Draft an all-time World Cup XI and rule the tournament.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Footy — All-Time World Cup XI Builder",
-    description: "Draft an all-time World Cup XI and win the tournament.",
+    title: "Dictator Mbappé — All-Time World Cup XI Builder",
+    description: "Draft an all-time World Cup XI and rule the tournament.",
   },
 };
 

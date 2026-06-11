@@ -10,8 +10,10 @@ export function squadCost(players: Player[]): number {
   return players.reduce((s, p) => s + playerCost(p.rating), 0);
 }
 
-// Total star-points budget for the 18-man squad, tighter on harder difficulties.
-export const BUDGET: Record<Difficulty, number> = { easy: 780, normal: 700, hard: 630 };
+// Total star-points budget for the 18-man squad. Generous enough to always
+// complete a strong, balanced squad — only an all-galáctico XI busts the cap.
+// (Reference costs: 99→73, 90→56, 85→47, 78→36, 70→24.)
+export const BUDGET: Record<Difficulty, number> = { easy: 1080, normal: 960, hard: 860 };
 
 // Reserve this much per still-unfilled STARTING slot so you can never get
 // locked out of completing your XI.

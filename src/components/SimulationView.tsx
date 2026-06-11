@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Check, Flag, Radio, SkipForward, Sparkles, X } from "lucide-react";
+import { Check, Flag, Radio, SkipForward, X } from "lucide-react";
 import type { MatchResult, TournamentResult } from "@/lib/types";
 import { USER_TEAM_NAME } from "@/data/teams";
 import { teamFlag } from "@/lib/flags";
@@ -102,7 +102,6 @@ export default function SimulationView({ result, onDone }: Props) {
 
   // One state object so the effect only mutates state inside timeouts.
   const [{ idx, scoreShown }, setStep] = useState({ idx: 0, scoreShown: false });
-  const [inShootout, setInShootout] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const curEvent = idx < events.length ? events[idx] : null;
@@ -282,23 +281,6 @@ export default function SimulationView({ result, onDone }: Props) {
         </section>
       )}
 
-      {/* Penalty shootout prompt */}
-      {needsShootout && !inShootout && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-2 pt-1"
-        >
-          <p className="text-sm text-slate-300">It&apos;s level — your match goes to penalties!</p>
-          <button
-            onClick={() => setInShootout(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-6 py-3 font-bold text-amber-950 transition hover:brightness-110"
-          >
-            <Sparkles className="h-4 w-4" /> Take the shootout
-          </button>
-        </motion.div>
-      )}
-
       {finished && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -314,13 +296,11 @@ export default function SimulationView({ result, onDone }: Props) {
         </motion.div>
       )}
 
-      {inShootout && curEvent?.type === "match" && (
+      {/* Penalties auto-pop a modal so it can never be missed. */}
+      {needsShootout && curEvent?.type === "match" && (
         <Shootout
           match={curEvent.match}
-          onDone={() => {
-            setInShootout(false);
-            setStep({ idx: idx + 1, scoreShown: false });
-          }}
+          onDone={() => setStep({ idx: idx + 1, scoreShown: false })}
         />
       )}
     </div>

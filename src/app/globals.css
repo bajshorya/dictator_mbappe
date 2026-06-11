@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #05070d;
-  --foreground: #eef2f7;
-  --accent: #34d399;
+  --background: #060a14;
+  --foreground: #f3f6fb;
+  --gold: #fbbf24;
+  --grass: #22c55e;
+  --emerald: #34d399;
+  --pink: #f472b6;
+  --sky: #38bdf8;
 }
 
 @theme inline {
@@ -22,32 +26,88 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100dvh;
-  background-color: #05070d;
+  position: relative;
+  background-color: #060a14;
   background-image:
-    radial-gradient(60% 50% at 12% 0%, rgba(52, 211, 153, 0.16), transparent 70%),
-    radial-gradient(50% 45% at 90% 5%, rgba(99, 102, 241, 0.18), transparent 70%),
-    radial-gradient(55% 50% at 50% 100%, rgba(6, 182, 212, 0.12), transparent 70%);
+    radial-gradient(48rem 32rem at 8% -8%, rgba(251, 191, 36, 0.16), transparent 60%),
+    radial-gradient(44rem 30rem at 100% 0%, rgba(52, 211, 153, 0.16), transparent 60%),
+    radial-gradient(50rem 40rem at 50% 120%, rgba(244, 114, 182, 0.14), transparent 60%),
+    linear-gradient(180deg, #070b16 0%, #05070f 100%);
   background-attachment: fixed;
 }
 
+/* film grain so it never looks flat / AI-default */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------------- typography ---------------- */
 .font-display {
   font-family: var(--font-display), system-ui, sans-serif;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
 }
-
+.headline {
+  font-family: var(--font-display), system-ui, sans-serif;
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+}
 .text-glow {
-  text-shadow: 0 0 24px rgba(52, 211, 153, 0.5);
+  text-shadow: 0 0 26px rgba(52, 211, 153, 0.45);
+}
+.text-stroke {
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.35);
 }
 
-/* Glassmorphism panel */
+/* gold/emerald brand gradient text */
+.brand-gradient {
+  background: linear-gradient(100deg, #fde68a 0%, #34d399 45%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------------- surfaces & controls ---------------- */
+.surface {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
 .glass {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* Loading shimmer */
+.btn-hero {
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
+  color: #2a1a02;
+  box-shadow: 0 8px 0 -2px #b4790a, 0 16px 30px -12px rgba(251, 191, 36, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.btn-hero:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+.btn-hero:active {
+  transform: translateY(4px);
+  box-shadow: 0 4px 0 -2px #b4790a;
+}
+
+/* loading shimmer */
 .shimmer {
   background: linear-gradient(110deg, #131a26 8%, #1f2937 18%, #131a26 33%);
   background-size: 200% 100%;
@@ -59,38 +119,73 @@ body {
   }
 }
 
-/* Glowing target slot */
+/* glowing target slot */
 .slot-open {
   animation: glow 1.5s ease-in-out infinite;
 }
 @keyframes glow {
   0%,
   100% {
-    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.55), 0 0 14px rgba(250, 204, 21, 0.3);
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.6), 0 0 14px rgba(251, 191, 36, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 2px rgba(250, 204, 21, 1), 0 0 28px rgba(250, 204, 21, 0.65);
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 1), 0 0 30px rgba(251, 191, 36, 0.7);
   }
 }
 
-/* ---------- football pitch ---------- */
+/* floating ball accents */
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-16px) rotate(12deg);
+  }
+}
+.floaty {
+  animation: floaty 7s ease-in-out infinite;
+}
+
+/* marquee ticker */
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee > div {
+  display: inline-block;
+  animation: marquee 32s linear infinite;
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------------- football pitch ---------------- */
 .pitch {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 16px;
   background-image: repeating-linear-gradient(
     to bottom,
     #0f7a43 0,
     #0f7a43 8.33%,
-    #128a4b 8.33%,
-    #128a4b 16.66%
+    #138a4c 8.33%,
+    #138a4c 16.66%
   );
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.35), 0 20px 50px -20px rgba(0, 0, 0, 0.7);
 }
 .pitch::before {
   content: "";
   position: absolute;
   inset: 7px;
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.5);
   border-radius: 8px;
 }
 .pitch::after {
@@ -99,7 +194,7 @@ body {
   left: 7px;
   right: 7px;
   top: 50%;
-  border-top: 2px solid rgba(255, 255, 255, 0.45);
+  border-top: 2px solid rgba(255, 255, 255, 0.5);
 }
 .pitch-circle {
   position: absolute;
@@ -108,17 +203,16 @@ body {
   width: 24%;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.5);
   border-radius: 50%;
 }
-/* penalty boxes top & bottom */
 .pitch-box {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   width: 46%;
   height: 14%;
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 .pitch-box.top {
   top: 7px;
@@ -137,9 +231,17 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #283041;
+  background: #2a3242;
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #374151;
+  background: #3a4456;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floaty,
+  .marquee > div,
+  .slot-open {
+    animation: none;
+  }
 }

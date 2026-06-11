@@ -37,8 +37,8 @@ const ShareCard = forwardRef<HTMLDivElement, Props>(function ShareCard(
       className="overflow-hidden rounded-3xl p-6 ring-1 ring-white/10"
     >
       <div className="flex items-center justify-between">
-        <div className="font-display text-2xl tracking-tight">
-          <span className="text-emerald-400">FOOTY</span>
+        <div className="font-display text-lg leading-none tracking-tight">
+          <span className="text-yellow-300">DICTATOR</span> <span className="text-emerald-400">MBAPPÉ</span>
         </div>
         <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
           {difficulty} · {formationName}
@@ -92,7 +92,7 @@ const ShareCard = forwardRef<HTMLDivElement, Props>(function ShareCard(
       )}
 
       <div className="mt-4 text-center text-[10px] text-slate-500">
-        Build your all-time World Cup XI · Footy
+        Build your all-time World Cup XI · Dictator Mbappé
       </div>
     </div>
   );

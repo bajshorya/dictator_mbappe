@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { toPng } from "html-to-image";
+import confetti from "canvas-confetti";
 import { Award, BarChart3, Download, Layers, RotateCcw, Share2, Swords, Trophy } from "lucide-react";
 import type { Difficulty, Formation, MatchResult, Player, TournamentResult } from "@/lib/types";
 import { USER_TEAM_NAME } from "@/data/teams";
@@ -94,6 +95,19 @@ export default function ResultsView({ result, xi, formation, captainId, difficul
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Confetti shower for champions.
+  useEffect(() => {
+    if (!result.userWon) return;
+    const end = Date.now() + 1400;
+    const colors = ["#fbbf24", "#34d399", "#38bdf8", "#f472b6", "#ffffff"];
+    const frame = () => {
+      confetti({ particleCount: 5, angle: 60, spread: 65, origin: { x: 0 }, colors });
+      confetti({ particleCount: 5, angle: 120, spread: 65, origin: { x: 1 }, colors });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+    frame();
+  }, [result.userWon]);
+
   async function exportPng(): Promise<{ url: string; blob: Blob } | null> {
     if (!cardRef.current) return null;
     const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
@@ -122,10 +136,10 @@ export default function ResultsView({ result, xi, formation, captainId, difficul
       const out = await exportPng();
       if (!out) return;
       const file = new File([out.blob], "footy-squad.png", { type: "image/png" });
-      const text = `My all-time World Cup XI just finished: ${result.userPlacement}! Build yours on Footy.`;
+      const text = `My all-time World Cup XI just finished: ${result.userPlacement}! Build yours on Dictator Mbappé.`;
       const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
       if (nav.canShare?.({ files: [file] }) && navigator.share) {
-        await navigator.share({ files: [file], title: "Footy", text });
+        await navigator.share({ files: [file], title: "Dictator Mbappé", text });
       } else {
         // Fallback: download the image + open an X/Twitter compose window.
         const a = document.createElement("a");
