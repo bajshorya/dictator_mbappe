@@ -12,6 +12,7 @@ import { BUDGET, canAfford, playerCost, squadCost } from "@/lib/cost";
 import { isMuted, setMuted, sound } from "@/lib/sound";
 import { dailyKey, dailySeed, setSeed } from "@/lib/rng";
 import { getDaily, getHallOfFame, placementRank, saveDaily, type HallOfFame } from "@/lib/storage";
+import { bumpPlays, fetchPlays } from "@/lib/plays";
 import { flagFor } from "@/lib/flags";
 import PitchView from "@/components/PitchView";
 import PlayerCard from "@/components/PlayerCard";
@@ -417,6 +418,7 @@ export default function Home() {
     const seed = isDaily ? dailySeed() + 7 : null; // reproducible result for the daily
     const r = simulateTournament(xiPlayers, benchPlayers, { captainId, difficulty, tactics, seed });
     setResult(r);
+    void bumpPlays(); // global "lineups played" counter (fire-and-forget)
     if (isDaily) {
       const grade = ["F", "F", "E", "D", "C", "B", "A", "S"][placementRank(r.userPlacement)] ?? "F";
       saveDaily(dailyKey(), { placement: r.userPlacement, won: r.userWon, grade });
@@ -954,11 +956,13 @@ function ModePicker({
 }) {
   const [hof, setHof] = useState<HallOfFame | null>(null);
   const [daily, setDaily] = useState<ReturnType<typeof getDaily>>(null);
+  const [plays, setPlays] = useState<number | null>(null);
   useEffect(() => {
     const id = window.setTimeout(() => {
       setHof(getHallOfFame());
       setDaily(getDaily(dailyKey()));
     }, 0);
+    fetchPlays().then(setPlays);
     return () => window.clearTimeout(id);
   }, []);
 
@@ -1014,6 +1018,18 @@ function ModePicker({
             {legends}
           </div>
         </div>
+
+        {plays != null && plays > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-4 py-1.5 text-sm ring-1 ring-emerald-400/30"
+          >
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            <span className="font-mono font-bold text-emerald-300">{plays.toLocaleString()}</span>
+            <span className="text-slate-300">lineups have ruled the World Cup</span>
+          </motion.div>
+        )}
       </div>
 
       {hof && hof.plays > 0 && (
