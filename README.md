@@ -86,19 +86,7 @@ node scripts/build-wc-squads.mjs   # → src/data/wc-squads.json
 
 The script downloads the source CSVs, filters to **men's World Cups 1982–2022** and a curated set of recognisable nations, and computes each player's rating by **blending their performance in that tournament with their career-peak World Cup rating** (so a legend who had one bad tournament still rates like a legend).
 
-## 🌍 Live play counter (optional)
 
-The home screen shows a global **"lineups played"** count via `/api/plays`, backed by
-[Upstash Redis](https://upstash.com). It's optional — without a store configured the API
-returns `null` and the counter simply hides, so dev and builds work unchanged.
-
-To enable it:
-
-1. On Vercel → your project → **Storage** → **Create** a free **Redis (Upstash)** database and connect it.
-   That injects `KV_REST_API_URL` / `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`).
-2. Redeploy. The counter goes live and increments each time a tournament is simulated.
-
-For local testing, put the same values in `.env.local`.
 
 ## 📁 Project structure
 
