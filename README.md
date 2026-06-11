@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/icon.svg" width="96" alt="Dictator Mbappé logo" />
+<img src="public/logo.png" width="120" alt="Dictator Mbappé logo" style="border-radius:24px" />
 
 # ⚽ Dictator Mbappé
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import { CalendarDays, ChevronLeft, Coins, Dices, HelpCircle, Layers, Link2, PlusCircle, RefreshCw, Shuffle, Sliders, Sparkles, Trophy, Users, Volume2, VolumeX, Wand2 } from "lucide-react";
 import type { Difficulty, Formation, GameMode, Lineup, Player, Position, Squad, TournamentResult } from "@/lib/types";
@@ -449,11 +450,18 @@ export default function Home() {
         >
           {muted ? <VolumeX className="h-4 w-4 text-slate-400" /> : <Volume2 className="h-4 w-4 text-emerald-300" />}
         </button>
-        <button onClick={goHome} className="group cursor-pointer">
-          <span className="headline block text-4xl leading-none sm:text-5xl">
+        <button onClick={goHome} className="group inline-flex cursor-pointer items-center gap-3">
+          <Image
+            src="/dictator-kylian-mbappe-v0.webp"
+            alt="Dictator Mbappé"
+            width={56}
+            height={56}
+            priority
+            className="h-12 w-12 rounded-2xl object-cover shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-400/60 transition group-hover:ring-yellow-300/80 sm:h-14 sm:w-14"
+          />
+          <span className="headline text-3xl leading-none sm:text-4xl">
             <span className="brand-gradient">DICTATOR</span>{" "}
             <span className="text-slate-50 text-stroke">MBAPPÉ</span>
-            <span className="ml-1 inline-block text-emerald-400 transition group-hover:rotate-12">⚽</span>
           </span>
         </button>
         <Stepper phase={phase} />
@@ -978,6 +986,21 @@ function ModePicker({
     <div>
       {/* Hero */}
       <div className="mb-8 text-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, rotate: -4 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 16 }}
+          className="mx-auto mb-5 w-fit"
+        >
+          <Image
+            src="/dictator-kylian-mbappe-v0.webp"
+            alt="Dictator Mbappé"
+            width={180}
+            height={180}
+            priority
+            className="floaty h-32 w-32 rounded-[2rem] object-cover shadow-2xl shadow-emerald-900/50 ring-4 ring-emerald-400/50 sm:h-40 sm:w-40"
+          />
+        </motion.div>
         <h1 className="headline text-balance text-3xl sm:text-5xl">
           Assemble the greatest <span className="brand-gradient">World Cup XI</span> ever assembled.
         </h1>
